@@ -12,7 +12,7 @@ enum PartiallyAssembledInstruction {
     SymbolicAddress(String),
 }
 
-fn predefined_symbol_table() -> HashMap<String, usize> {
+fn predefined_symbol_table() -> HashMap<String, u16> {
     let mut result = HashMap::new();
     for &(name, address) in &[
         ("SP", 0),
@@ -34,7 +34,8 @@ fn predefined_symbol_table() -> HashMap<String, usize> {
 struct Assembler {
     state: AssemblerState,
     instruction_buffer: String,
-    symbol_table: HashMap<String, usize>,
+    symbol_table: HashMap<String, u16>,
+    extra_data_address: u16,
     output: Vec<PartiallyAssembledInstruction>,
 }
 
@@ -44,6 +45,7 @@ impl Assembler {
             state: AssemblerState::LookingForInstruction,
             instruction_buffer: String::new(),
             symbol_table: predefined_symbol_table(),
+            extra_data_address: 0b10000,
             output: Vec::new(),
         }
     }
@@ -143,7 +145,7 @@ impl Assembler {
                 // Label metainstruction
                 let symbol_name = &trimmed[1..trimmed.len() - 1];
                 self.symbol_table
-                    .insert(String::from(symbol_name), self.output.len());
+                    .insert(String::from(symbol_name), self.output.len() as _);
             } else {
                 self.assemble_c_type_instruction();
             }
@@ -189,7 +191,10 @@ impl Assembler {
                 if let Some(value) = self.symbol_table.get(&symbol) {
                     *value as _
                 } else {
-                    panic!("\"{}\" is not a valid symbol.", symbol)
+                    let address = self.extra_data_address;
+                    self.extra_data_address += 1;
+                    self.symbol_table.insert(symbol, address);
+                    address
                 }
             }
         }
